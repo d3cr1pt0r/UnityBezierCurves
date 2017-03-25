@@ -78,6 +78,13 @@ public class BezierCurveEditor : Editor
 			float handleSize = HandleUtility.GetHandleSize (bezierPoint.position) * bezierCurve.handleSize;
 			Vector3 position = Handles.FreeMoveHandle (bezierPoint.GetPosition (), Quaternion.identity, handleSize, GetSnapSize (), Handles.RectangleCap);
 
+			Handles.Label (bezierPoint.GetPosition () + Vector3.right * 0.5f, bezierPoint.name);
+
+			if (bezierPoint.GetLocalPosition () != position) {
+				Undo.RecordObject (target, "Move Point");
+				bezierPoint.SetPosition (position);
+			}
+
 			if (bezierPoint.pointType != BezierPointType.None) {
 				Vector3 handle1 = Handles.FreeMoveHandle (bezierPoint.GetHandle1Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
 				Vector3 handle2 = Handles.FreeMoveHandle (bezierPoint.GetHandle2Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
@@ -85,29 +92,33 @@ public class BezierCurveEditor : Editor
 				Handles.DrawLine (position, handle1);
 				Handles.DrawLine (position, handle2);
 
-				if (bezierPoint.GetHandle1LocalPosition () != handle1) {
+				int handleToAdjust = 0;
+
+				if (bezierPoint.GetHandle1Position () != handle1) {
 					Undo.RecordObject (target, "Move Handle Point 1");
 					bezierPoint.SetHandle1Position (handle1);
 
 					if (bezierPoint.pointType == BezierPointType.Connected) {
-						bezierPoint.SetHandle2Position (position + (handle1 - position) * -1.0f);
+						handleToAdjust = 2;
 					}
 				}
-				if (bezierPoint.GetHandle2LocalPosition () != handle2) {
+				if (bezierPoint.GetHandle2Position () != handle2) {
 					Undo.RecordObject (target, "Move Handle Point 2");
 					bezierPoint.SetHandle2Position (handle2);
 
 					if (bezierPoint.pointType == BezierPointType.Connected) {
-						bezierPoint.SetHandle1Position (position + (handle2 - position) * -1.0f);
+						handleToAdjust = 1;
 					}
 				}
-			}
 
-			Handles.Label (bezierPoint.GetPosition () + Vector3.right * 0.5f, bezierPoint.name);
-
-			if (bezierPoint.GetLocalPosition () != position) {
-				Undo.RecordObject (target, "Move Point");
-				bezierPoint.SetPosition (position);
+				if (bezierPoint.pointType == BezierPointType.Connected) {
+					if (handleToAdjust == 1) {
+						bezierPoint.SetHandle1Position (position + (handle2 - position) * -1.0f);
+					}
+					if (handleToAdjust == 2) {
+						bezierPoint.SetHandle2Position (position + (handle1 - position) * -1.0f);
+					}
+				}
 			}
 		}
 
