@@ -9,11 +9,15 @@ public class BezierCurveEditor : Editor
 	private BezierCurve bezierCurve = null;
 	private BezierCurveData bezierCurveData = null;
 	private bool showSettings = false;
-	private int numberOfSampledPointsOnCurve = 0;
 	private string bezierCurveDataName = "";
+
+	private int numberOfSampledPointsOnCurve = 0;
+	private Color anchorPointHandleColor = Color.white;
 	private List<CurvePoint> curvePoints = null;
 	private BezierPoint lastSelectedPoint = null;
 	private List<BezierPoint> selectedPoints = null;
+	private BezierPoint nearBezierPoint = null;
+	private CurvePoint nearCurvePoint = null;
 
 	private void Init ()
 	{
@@ -77,27 +81,10 @@ public class BezierCurveEditor : Editor
 
 	private void OnSceneGUI ()
 	{
-		DrawScenePointControls ();
-
-		// node type shortcuts
-		if (lastSelectedPoint != null) {
-			if (Event.current.shift) {
-				if (Event.current.type == EventType.keyDown) {
-					if (Event.current.keyCode == KeyCode.Alpha1) {
-						lastSelectedPoint.pointType = BezierPointType.Connected;
-						lastSelectedPoint.SetHandlesInConnectedState ();
-					}
-					if (Event.current.keyCode == KeyCode.Alpha2) {
-						lastSelectedPoint.pointType = BezierPointType.Broken;
-					}
-					if (Event.current.keyCode == KeyCode.Alpha3) {
-						lastSelectedPoint.pointType = BezierPointType.None;
-					}
-				}
-			}
-		}
-
 		DrawCurve ();
+
+		DrawScenePointControls ();
+		NodeTypeShortcuts ();
 	}
 
 	private void DrawBezierPointControls (BezierCurve bezierCurve)
@@ -152,39 +139,21 @@ public class BezierCurveEditor : Editor
 
 	}
 
-	private void DrawAddPointsSceneControls ()
-	{
-		if (curvePoints == null || !Event.current.shift) {
-			return;
-		}
-
-		Vector2 mousePosition = GetMouseWorldPosition2D ();
-		CurvePoint addCurvePoint = GetCurvePointAtMousePosition (curvePoints, mousePosition, 0.4f);
-
-		if (Event.current.type == EventType.mouseDown && Event.current.button == 0) {
-			if (Event.current.shift) {
-				if (addCurvePoint != null) {
-					AddPoint (addCurvePoint.position, new Vector3 (-2, 0, 0), new Vector3 (2, 0, 0), addCurvePoint.curveIndex);
-				} else {
-					AddPoint (new Vector3 (mousePosition.x, mousePosition.y, 0), new Vector3 (-2, 0, 0), new Vector3 (2, 0, 0), 0);
-				}
-			}
-		}
-	}
-
 	private void DrawScenePointControls ()
 	{
-		if (bezierCurve == null || curvePoints == null || bezierCurve.GetAnchorPoints ().Count == 0) {
+		if (bezierCurve == null) {
 			return;
 		}
 
 		List<BezierPoint> bezierPoints = bezierCurve.GetAnchorPoints ();
 		Vector2 mousePosition = GetMouseWorldPosition2D ();
 
-		BezierPoint nearBezierPoint = GetControlPointAtMousePosition (bezierPoints, mousePosition, 2.0f);
-		CurvePoint nearCurvePoint = GetCurvePointAtMousePosition (curvePoints, mousePosition, 0.4f);
+		nearBezierPoint = GetControlPointAtMousePosition (bezierPoints, mousePosition, 2.0f);
+		nearCurvePoint = GetCurvePointAtMousePosition (curvePoints, mousePosition, 0.4f);
 
-		DrawSceneAddPoint (nearCurvePoint, mousePosition);
+		if (nearBezierPoint == null) {
+			DrawSceneAddPoint (nearCurvePoint, mousePosition);
+		}
 		DrawSceneSelectedPoints (nearBezierPoint);
 
 		for (int i = 0; i < bezierPoints.Count; i++) {
@@ -199,11 +168,15 @@ public class BezierCurveEditor : Editor
 	private void DrawSceneAddPoint (CurvePoint curvePoint, Vector2 mousePosition)
 	{
 		if (Event.current.shift) {
+			Handles.color = Color.green;
 			if (curvePoint != null) {
-				Handles.CircleCap (0, curvePoint.position, Quaternion.identity, HandleUtility.GetHandleSize (curvePoint.position) * bezierCurve.handleSize);
-				Handles.Label (curvePoint.position + Vector3.right, curvePoint.curveIndex.ToString ());
-				SceneView.RepaintAll ();
+				Handles.color = Color.blue;
+				Handles.DrawSolidDisc (curvePoint.position, Vector3.forward, HandleUtility.GetHandleSize (curvePoint.position) * bezierCurve.handleSize * 0.8f);
+			} else {
+				Handles.DrawSolidDisc (mousePosition, Vector3.forward, HandleUtility.GetHandleSize (mousePosition) * bezierCurve.handleSize * 0.8f);
 			}
+			Handles.color = Color.white;
+			SceneView.RepaintAll ();
 
 			if (Event.current.type == EventType.mouseDown && Event.current.button == 0) {
 				if (curvePoint != null) {
@@ -222,6 +195,9 @@ public class BezierCurveEditor : Editor
 			Handles.DrawSolidRectangleWithOutline (new Rect (p, Vector3.one * handleSize * 2.0f), Color.yellow, Color.white);
 		}
 
+		if (bezierPoint == nearBezierPoint) {
+			Handles.color = Color.yellow;
+		}
 		Vector3 position = Handles.FreeMoveHandle (bezierPoint.GetPosition (), Quaternion.identity, handleSize, GetSnapSize (), Handles.RectangleCap);
 		Handles.color = Color.white;
 
@@ -236,8 +212,8 @@ public class BezierCurveEditor : Editor
 	private void DrawSceneControlPointsHandle (BezierPoint bezierPoint, float handleSize)
 	{
 		if (bezierPoint.pointType != BezierPointType.None) {
-			Vector3 handle1 = Handles.FreeMoveHandle (bezierPoint.GetHandle1Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
-			Vector3 handle2 = Handles.FreeMoveHandle (bezierPoint.GetHandle2Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
+			Vector3 handle1 = Handles.FreeMoveHandle (bezierPoint.GetHandle1Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.SphereCap);
+			Vector3 handle2 = Handles.FreeMoveHandle (bezierPoint.GetHandle2Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.SphereCap);
 
 			Handles.DrawLine (bezierPoint.GetPosition (), handle1);
 			Handles.DrawLine (bezierPoint.GetPosition (), handle2);
@@ -271,7 +247,14 @@ public class BezierCurveEditor : Editor
 			}
 
 			if (bezierPoint.pointType == BezierPointType.Connected) {
+				Color c = new Color (0, 0, 0, 0);
+				if (nearBezierPoint == bezierPoint) {
+					c = Color.yellow;
+				}
+
+				Handles.color = c;
 				Quaternion rotation = Handles.Disc (bezierPoint.GetHandlesRotation (), bezierPoint.GetPosition (), Vector3.forward, handleSize * 4.0f, true, 15);
+				Handles.color = Color.white;
 
 				if (bezierPoint.GetHandlesRotation () != rotation) {
 					Undo.RecordObject (target, "Rotate handle");
@@ -287,24 +270,36 @@ public class BezierCurveEditor : Editor
 			return;
 		}
 
-		Vector3 nearBezierPointPosition = nearBezierPoint.GetPosition ();
-		float handleSize = HandleUtility.GetHandleSize (nearBezierPointPosition) * bezierCurve.handleSize;
-
-		Vector3 position = nearBezierPointPosition - new Vector3 (1, 1, 0) * handleSize;
-		Handles.DrawSolidRectangleWithOutline (new Rect (position, Vector3.one * handleSize * 2.0f), Color.yellow, Color.white);
-
 		if (Event.current.type == EventType.mouseDown && Event.current.button == 0) {
 			lastSelectedPoint = nearBezierPoint;
 		}
 
-		if (Event.current.control) {
+		if (Event.current.shift) {
 			if (Event.current.type == EventType.mouseDown && Event.current.button == 0) {
 				if (!selectedPoints.Contains (nearBezierPoint)) {
 					selectedPoints.Add (nearBezierPoint);
-					Debug.Log (string.Format ("Added point {0} to selection", nearBezierPoint.name));
 				} else {
 					selectedPoints.Remove (nearBezierPoint);
-					Debug.Log (string.Format ("Removed point {0} from selection", nearBezierPoint.name));
+				}
+			}
+		}
+	}
+
+	private void NodeTypeShortcuts ()
+	{
+		if (lastSelectedPoint != null) {
+			if (Event.current.shift) {
+				if (Event.current.type == EventType.keyDown) {
+					if (Event.current.keyCode == KeyCode.Alpha1) {
+						lastSelectedPoint.pointType = BezierPointType.Connected;
+						lastSelectedPoint.SetHandlesInConnectedState ();
+					}
+					if (Event.current.keyCode == KeyCode.Alpha2) {
+						lastSelectedPoint.pointType = BezierPointType.Broken;
+					}
+					if (Event.current.keyCode == KeyCode.Alpha3) {
+						lastSelectedPoint.pointType = BezierPointType.None;
+					}
 				}
 			}
 		}
