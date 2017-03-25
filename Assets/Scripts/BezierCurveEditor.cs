@@ -89,6 +89,17 @@ public class BezierCurveEditor : Editor
 				Vector3 handle1 = Handles.FreeMoveHandle (bezierPoint.GetHandle1Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
 				Vector3 handle2 = Handles.FreeMoveHandle (bezierPoint.GetHandle2Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
 
+				if (bezierPoint.pointType == BezierPointType.Connected) {
+					Quaternion rotation = Handles.Disc (bezierPoint.GetHandlesRotation (), bezierPoint.GetPosition (), Vector3.forward, handleSize * 4.0f, true, 15);
+
+					if (bezierPoint.GetHandlesRotation () != rotation) {
+						Undo.RecordObject (target, "Rotate handle");
+						bezierPoint.SetHandlesRotation (rotation);
+
+						continue;
+					}
+				}
+
 				Handles.DrawLine (position, handle1);
 				Handles.DrawLine (position, handle2);
 

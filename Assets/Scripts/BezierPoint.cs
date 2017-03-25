@@ -53,6 +53,19 @@ public class BezierPoint
 		return handle2;
 	}
 
+	public Quaternion GetHandlesRotation ()
+	{
+		return Quaternion.LookRotation (GetHandle2Position () - GetPosition ());
+	}
+
+	public void SetHandlesRotation (Quaternion rotation)
+	{
+		Vector3 dir = (rotation * Vector3.forward).normalized;
+		float handleMagnitude = (GetHandle2Position () - GetPosition ()).magnitude;
+		SetHandle2Position (GetPosition () + dir * handleMagnitude);
+		SetHandle1Position (GetPosition () - dir * handleMagnitude);
+	}
+
 	public void SetPosition (Vector3 position)
 	{
 		this.position = position - bezierCurve.transform.position;
