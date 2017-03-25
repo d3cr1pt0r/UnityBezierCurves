@@ -66,6 +66,14 @@ public class BezierPoint
 		SetHandle1Position (GetPosition () - dir * handleMagnitude);
 	}
 
+	public void SetHandlesInConnectedState ()
+	{
+		Vector3 dir = (GetHandlesRotation () * Vector3.forward).normalized;
+		float handleMagnitude = (GetHandle2Position () - GetPosition ()).magnitude;
+		SetHandle2Position (GetPosition () + dir * handleMagnitude);
+		SetHandle1Position (GetPosition () - dir * handleMagnitude);
+	}
+
 	public void SetPosition (Vector3 position)
 	{
 		this.position = position - bezierCurve.transform.position;

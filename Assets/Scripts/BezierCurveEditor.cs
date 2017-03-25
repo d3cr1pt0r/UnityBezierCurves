@@ -83,6 +83,7 @@ public class BezierCurveEditor : Editor
 				if (Event.current.type == EventType.keyDown) {
 					if (Event.current.keyCode == KeyCode.Alpha1) {
 						lastSelectedPoint.pointType = BezierPointType.Connected;
+						lastSelectedPoint.SetHandlesInConnectedState ();
 					}
 					if (Event.current.keyCode == KeyCode.Alpha2) {
 						lastSelectedPoint.pointType = BezierPointType.Broken;
