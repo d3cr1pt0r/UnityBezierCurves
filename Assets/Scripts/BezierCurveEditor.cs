@@ -175,9 +175,9 @@ public class BezierCurveEditor : Editor
 		if (Event.current.type == EventType.mouseDown && Event.current.button == 0) {
 			if (Event.current.shift) {
 				if (addCurvePoint != null) {
-					AddPoint (addCurvePoint.position, new Vector3 (-1, 0, 0), new Vector3 (1, 0, 0), addCurvePoint.curveIndex);
+					AddPoint (addCurvePoint.position, new Vector3 (-2, 0, 0), new Vector3 (2, 0, 0), addCurvePoint.curveIndex);
 				} else {
-					AddPoint (new Vector3 (mousePosition2D.x, mousePosition2D.y, 0), new Vector3 (-1, 0, 0), new Vector3 (1, 0, 0), 0);
+					AddPoint (new Vector3 (mousePosition2D.x, mousePosition2D.y, 0), new Vector3 (-2, 0, 0), new Vector3 (2, 0, 0), 0);
 				}
 			}
 		}
@@ -299,8 +299,8 @@ public class BezierCurveEditor : Editor
 		Undo.RecordObject (bezierCurve, "Add Point");
 
 		Vector3 position = bezierCurve.transform.position + Vector3.up * 5.0f;
-		Vector3 handle1 = new Vector3 (-1, 0, 0);
-		Vector3 handle2 = new Vector3 (1, 0, 0);
+		Vector3 handle1 = new Vector3 (-2, 0, 0);
+		Vector3 handle2 = new Vector3 (2, 0, 0);
 
 		AddPoint (position, handle1, handle2, 0);
 	}
