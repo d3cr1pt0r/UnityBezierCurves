@@ -25,13 +25,17 @@ public class BezierCurve : MonoBehaviour
 		return points;
 	}
 
-	public void AddControlPoint (BezierPoint bezierPoint)
+	public void AddControlPoint (BezierPoint bezierPoint, int index = 0)
 	{
 		if (!points.Contains (bezierPoint)) {
 			bezierPoint.name = string.Format ("Point {0}", points.Count);
 			bezierPoint.SetToCurve (this);
 
-			points.Add (bezierPoint);
+			if (index == 0) {
+				points.Add (bezierPoint);
+			} else {
+				points.Insert (index, bezierPoint);
+			}
 		}
 	}
 
@@ -128,7 +132,7 @@ public class BezierCurve : MonoBehaviour
 				float step = (float)j / (float)sampleRate;
 				Vector3 position = GetPoint (p0, p1, step);
 
-				curvePoints.Add (new CurvePoint (position, Vector3.zero, Vector3.zero));
+				curvePoints.Add (new CurvePoint (position, Vector3.zero, Vector3.zero, i1));
 			}
 		}
 
