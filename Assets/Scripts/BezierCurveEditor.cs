@@ -21,6 +21,7 @@ public class BezierCurveEditor : Editor
 			bezierCurve = (BezierCurve)target;
 		}
 
+		selectedPoints = new List<BezierPoint> ();
 		RefreshCurvePoints ();
 	}
 
@@ -180,7 +181,7 @@ public class BezierCurveEditor : Editor
 		List<BezierPoint> bezierPoints = bezierCurve.GetAnchorPoints ();
 		Vector2 mousePosition = GetMouseWorldPosition2D ();
 
-		BezierPoint nearBezierPoint = GetControlPointAtMousePosition (bezierPoints, mousePosition, 0.4f);
+		BezierPoint nearBezierPoint = GetControlPointAtMousePosition (bezierPoints, mousePosition, 2.0f);
 		CurvePoint nearCurvePoint = GetCurvePointAtMousePosition (curvePoints, mousePosition, 0.4f);
 
 		DrawSceneAddPoint (nearCurvePoint, mousePosition);
