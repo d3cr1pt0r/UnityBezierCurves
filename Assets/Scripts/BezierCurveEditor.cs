@@ -13,6 +13,7 @@ public class BezierCurveEditor : Editor
 	private string bezierCurveDataName = "";
 	private List<CurvePoint> curvePoints = null;
 	private BezierPoint lastSelectedPoint = null;
+	private List<BezierPoint> selectedPoints = null;
 
 	private void Init ()
 	{
@@ -75,9 +76,9 @@ public class BezierCurveEditor : Editor
 
 	private void OnSceneGUI ()
 	{
-		DrawAddPointsSceneControls ();
-		DrawPointsSceneControls ();
+		DrawScenePointControls ();
 
+		// node type shortcuts
 		if (lastSelectedPoint != null) {
 			if (Event.current.shift) {
 				if (Event.current.type == EventType.keyDown) {
@@ -100,7 +101,7 @@ public class BezierCurveEditor : Editor
 
 	private void DrawBezierPointControls (BezierCurve bezierCurve)
 	{
-		List<BezierPoint> points = bezierCurve.GetControlPoints ();
+		List<BezierPoint> points = bezierCurve.GetAnchorPoints ();
 		string[] bezierPointTypes = System.Enum.GetNames (typeof(BezierPointType));
 
 		if (points == null) {
@@ -156,102 +157,153 @@ public class BezierCurveEditor : Editor
 			return;
 		}
 
-		Vector3 mousePosition = GetMouseWorldPosition ();
-		Vector2 mousePosition2D = new Vector2 (mousePosition.x, mousePosition.y);
-		CurvePoint addCurvePoint = null;
-
-		for (int i = 0; i < curvePoints.Count; i++) {
-			Vector2 curvePoint2D = new Vector2 (curvePoints [i].position.x, curvePoints [i].position.y);
-			float distance = (mousePosition2D - curvePoint2D).magnitude;
-			if (distance < 0.4f) {
-				Handles.CircleCap (0, curvePoints [i].position, Quaternion.identity, HandleUtility.GetHandleSize (curvePoints [i].position) * bezierCurve.handleSize);
-				Handles.Label (curvePoints [i].position + Vector3.right, curvePoints [i].curveIndex.ToString ());
-				SceneView.RepaintAll ();
-				addCurvePoint = curvePoints [i];
-				break;
-			}
-		}
+		Vector2 mousePosition = GetMouseWorldPosition2D ();
+		CurvePoint addCurvePoint = GetCurvePointAtMousePosition (curvePoints, mousePosition, 0.4f);
 
 		if (Event.current.type == EventType.mouseDown && Event.current.button == 0) {
 			if (Event.current.shift) {
 				if (addCurvePoint != null) {
 					AddPoint (addCurvePoint.position, new Vector3 (-2, 0, 0), new Vector3 (2, 0, 0), addCurvePoint.curveIndex);
 				} else {
-					AddPoint (new Vector3 (mousePosition2D.x, mousePosition2D.y, 0), new Vector3 (-2, 0, 0), new Vector3 (2, 0, 0), 0);
+					AddPoint (new Vector3 (mousePosition.x, mousePosition.y, 0), new Vector3 (-2, 0, 0), new Vector3 (2, 0, 0), 0);
 				}
 			}
 		}
 	}
 
-	private void DrawPointsSceneControls ()
+	private void DrawScenePointControls ()
 	{
-		if (bezierCurve == null || bezierCurve.GetControlPoints ().Count == 0) {
+		if (bezierCurve == null || curvePoints == null || bezierCurve.GetAnchorPoints ().Count == 0) {
 			return;
 		}
 
-		List<BezierPoint> points = bezierCurve.GetControlPoints ();
+		List<BezierPoint> bezierPoints = bezierCurve.GetAnchorPoints ();
+		Vector2 mousePosition = GetMouseWorldPosition2D ();
 
-		for (int i = 0; i < points.Count; i++) {
-			BezierPoint bezierPoint = points [i];
+		BezierPoint nearBezierPoint = GetControlPointAtMousePosition (bezierPoints, mousePosition, 0.4f);
+		CurvePoint nearCurvePoint = GetCurvePointAtMousePosition (curvePoints, mousePosition, 0.4f);
+
+		DrawSceneAddPoint (nearCurvePoint, mousePosition);
+		DrawSceneSelectedPoints (nearBezierPoint);
+
+		for (int i = 0; i < bezierPoints.Count; i++) {
+			BezierPoint bezierPoint = bezierPoints [i];
 			float handleSize = HandleUtility.GetHandleSize (bezierPoint.position) * bezierCurve.handleSize;
 
-			EditorGUI.BeginChangeCheck ();
-			Vector3 position = Handles.FreeMoveHandle (bezierPoint.GetPosition (), Quaternion.identity, handleSize, GetSnapSize (), Handles.RectangleCap);
-			if (EditorGUI.EndChangeCheck ()) {
-				lastSelectedPoint = bezierPoint;
+			DrawSceneAnchorPointHandle (bezierPoint, nearBezierPoint, handleSize);
+			DrawSceneControlPointsHandle (bezierPoint, handleSize);
+		}
+	}
+
+	private void DrawSceneAddPoint (CurvePoint curvePoint, Vector2 mousePosition)
+	{
+		if (Event.current.shift) {
+			if (curvePoint != null) {
+				Handles.CircleCap (0, curvePoint.position, Quaternion.identity, HandleUtility.GetHandleSize (curvePoint.position) * bezierCurve.handleSize);
+				Handles.Label (curvePoint.position + Vector3.right, curvePoint.curveIndex.ToString ());
+				SceneView.RepaintAll ();
 			}
 
-			Handles.Label (bezierPoint.GetPosition () + Vector3.right * 0.5f, bezierPoint.name);
+			if (Event.current.type == EventType.mouseDown && Event.current.button == 0) {
+				if (curvePoint != null) {
+					AddPoint (curvePoint.position, new Vector3 (-2, 0, 0), new Vector3 (2, 0, 0), curvePoint.curveIndex);
+				} else {
+					AddPoint (new Vector3 (mousePosition.x, mousePosition.y, 0), new Vector3 (-2, 0, 0), new Vector3 (2, 0, 0), 0);
+				}
+			}
+		}
+	}
 
-			if (bezierPoint.GetLocalPosition () != position) {
-				Undo.RecordObject (target, "Move Point");
-				bezierPoint.SetPosition (position);
+	private void DrawSceneAnchorPointHandle (BezierPoint bezierPoint, BezierPoint nearBezierPoint, float handleSize)
+	{
+		if (selectedPoints.Contains (bezierPoint)) {
+			Vector3 p = bezierPoint.GetPosition () - new Vector3 (1, 1, 0) * handleSize;
+			Handles.DrawSolidRectangleWithOutline (new Rect (p, Vector3.one * handleSize * 2.0f), Color.yellow, Color.white);
+		}
+
+		Vector3 position = Handles.FreeMoveHandle (bezierPoint.GetPosition (), Quaternion.identity, handleSize, GetSnapSize (), Handles.RectangleCap);
+		Handles.color = Color.white;
+
+		Handles.Label (bezierPoint.GetPosition () + Vector3.right * 0.5f, bezierPoint.name);
+
+		if (bezierPoint.GetLocalPosition () != position) {
+			Undo.RecordObject (target, "Move Point");
+			bezierPoint.SetPosition (position);
+		}
+	}
+
+	private void DrawSceneControlPointsHandle (BezierPoint bezierPoint, float handleSize)
+	{
+		if (bezierPoint.pointType != BezierPointType.None) {
+			Vector3 handle1 = Handles.FreeMoveHandle (bezierPoint.GetHandle1Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
+			Vector3 handle2 = Handles.FreeMoveHandle (bezierPoint.GetHandle2Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
+
+			Handles.DrawLine (bezierPoint.GetPosition (), handle1);
+			Handles.DrawLine (bezierPoint.GetPosition (), handle2);
+
+			int handleToAdjust = 0;
+
+			if (bezierPoint.GetHandle1Position () != handle1) {
+				Undo.RecordObject (target, "Move Handle Point 1");
+				bezierPoint.SetHandle1Position (handle1);
+
+				if (bezierPoint.pointType == BezierPointType.Connected) {
+					handleToAdjust = 2;
+				}
+			}
+			if (bezierPoint.GetHandle2Position () != handle2) {
+				Undo.RecordObject (target, "Move Handle Point 2");
+				bezierPoint.SetHandle2Position (handle2);
+
+				if (bezierPoint.pointType == BezierPointType.Connected) {
+					handleToAdjust = 1;
+				}
 			}
 
-			if (bezierPoint.pointType != BezierPointType.None) {
-				Vector3 handle1 = Handles.FreeMoveHandle (bezierPoint.GetHandle1Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
-				Vector3 handle2 = Handles.FreeMoveHandle (bezierPoint.GetHandle2Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.CircleCap);
-
-				if (bezierPoint.pointType == BezierPointType.Connected) {
-					Quaternion rotation = Handles.Disc (bezierPoint.GetHandlesRotation (), bezierPoint.GetPosition (), Vector3.forward, handleSize * 4.0f, true, 15);
-
-					if (bezierPoint.GetHandlesRotation () != rotation) {
-						Undo.RecordObject (target, "Rotate handle");
-						bezierPoint.SetHandlesRotation (rotation);
-
-						continue;
-					}
+			if (bezierPoint.pointType == BezierPointType.Connected) {
+				if (handleToAdjust == 1) {
+					bezierPoint.SetHandle1Position (bezierPoint.GetPosition () + (handle2 - bezierPoint.GetPosition ()) * -1.0f);
 				}
-
-				Handles.DrawLine (position, handle1);
-				Handles.DrawLine (position, handle2);
-
-				int handleToAdjust = 0;
-
-				if (bezierPoint.GetHandle1Position () != handle1) {
-					Undo.RecordObject (target, "Move Handle Point 1");
-					bezierPoint.SetHandle1Position (handle1);
-
-					if (bezierPoint.pointType == BezierPointType.Connected) {
-						handleToAdjust = 2;
-					}
+				if (handleToAdjust == 2) {
+					bezierPoint.SetHandle2Position (bezierPoint.GetPosition () + (handle1 - bezierPoint.GetPosition ()) * -1.0f);
 				}
-				if (bezierPoint.GetHandle2Position () != handle2) {
-					Undo.RecordObject (target, "Move Handle Point 2");
-					bezierPoint.SetHandle2Position (handle2);
+			}
 
-					if (bezierPoint.pointType == BezierPointType.Connected) {
-						handleToAdjust = 1;
-					}
+			if (bezierPoint.pointType == BezierPointType.Connected) {
+				Quaternion rotation = Handles.Disc (bezierPoint.GetHandlesRotation (), bezierPoint.GetPosition (), Vector3.forward, handleSize * 4.0f, true, 15);
+
+				if (bezierPoint.GetHandlesRotation () != rotation) {
+					Undo.RecordObject (target, "Rotate handle");
+					bezierPoint.SetHandlesRotation (rotation);
 				}
+			}
+		}
+	}
 
-				if (bezierPoint.pointType == BezierPointType.Connected) {
-					if (handleToAdjust == 1) {
-						bezierPoint.SetHandle1Position (position + (handle2 - position) * -1.0f);
-					}
-					if (handleToAdjust == 2) {
-						bezierPoint.SetHandle2Position (position + (handle1 - position) * -1.0f);
-					}
+	private void DrawSceneSelectedPoints (BezierPoint nearBezierPoint)
+	{
+		if (nearBezierPoint == null) {
+			return;
+		}
+
+		Vector3 nearBezierPointPosition = nearBezierPoint.GetPosition ();
+		float handleSize = HandleUtility.GetHandleSize (nearBezierPointPosition) * bezierCurve.handleSize;
+
+		Vector3 position = nearBezierPointPosition - new Vector3 (1, 1, 0) * handleSize;
+		Handles.DrawSolidRectangleWithOutline (new Rect (position, Vector3.one * handleSize * 2.0f), Color.yellow, Color.white);
+
+		if (Event.current.type == EventType.mouseDown && Event.current.button == 0) {
+			lastSelectedPoint = nearBezierPoint;
+		}
+
+		if (Event.current.control) {
+			if (Event.current.type == EventType.mouseDown && Event.current.button == 0) {
+				if (!selectedPoints.Contains (nearBezierPoint)) {
+					selectedPoints.Add (nearBezierPoint);
+					Debug.Log (string.Format ("Added point {0} to selection", nearBezierPoint.name));
+				} else {
+					selectedPoints.Remove (nearBezierPoint);
+					Debug.Log (string.Format ("Removed point {0} from selection", nearBezierPoint.name));
 				}
 			}
 		}
@@ -287,11 +339,44 @@ public class BezierCurveEditor : Editor
 		return Vector3.one * bezierCurve.snapSize;
 	}
 
+	private CurvePoint GetCurvePointAtMousePosition (List<CurvePoint> curvePoints, Vector2 mousePosition, float minDistance)
+	{
+		for (int i = 0; i < curvePoints.Count; i++) {
+			Vector2 curvePoint2D = new Vector2 (curvePoints [i].position.x, curvePoints [i].position.y);
+			float distance = (mousePosition - curvePoint2D).magnitude;
+			if (distance < minDistance) {
+				return curvePoints [i];
+			}
+		}
+
+		return null;
+	}
+
+	private BezierPoint GetControlPointAtMousePosition (List<BezierPoint> bezierPoints, Vector2 mousePosition, float minDistance)
+	{
+		for (int i = 0; i < bezierPoints.Count; i++) {
+			Vector2 point = new Vector2 (bezierPoints [i].GetPosition ().x, bezierPoints [i].GetPosition ().y);
+			float distance = (mousePosition - point).magnitude;
+
+			if (distance < minDistance) {
+				return bezierPoints [i];
+			}
+		}
+
+		return null;
+	}
+
 	private Vector3 GetMouseWorldPosition ()
 	{
 		Vector3 mousePosition = Event.current.mousePosition;
 		mousePosition.y = Camera.current.pixelHeight - mousePosition.y;
 		return Camera.current.ScreenPointToRay (mousePosition).origin;
+	}
+
+	private Vector2 GetMouseWorldPosition2D ()
+	{
+		Vector3 mousePosition = GetMouseWorldPosition ();
+		return new Vector2 (mousePosition.x, mousePosition.y);
 	}
 
 	private void AddPoint ()
@@ -310,7 +395,7 @@ public class BezierCurveEditor : Editor
 		Undo.RecordObject (bezierCurve, "Add Point");
 
 		BezierPoint bezierPoint = new BezierPoint (position, handle1, handle2);
-		bezierCurve.AddControlPoint (bezierPoint, curveIndex);
+		bezierCurve.AddAnchorPoint (bezierPoint, curveIndex);
 		bezierPoint.SetPosition (position); // wierd code :(
 
 		SceneView.RepaintAll ();
@@ -320,7 +405,7 @@ public class BezierCurveEditor : Editor
 	{
 		Undo.RecordObject (bezierCurve, "Remove All Points");
 
-		bezierCurve.RemoveAllControlPoints ();
+		bezierCurve.RemoveAllAnchorPoints ();
 		SceneView.RepaintAll ();
 	}
 
@@ -328,7 +413,7 @@ public class BezierCurveEditor : Editor
 	{
 		Undo.RecordObject (bezierCurve, "Remove Point");
 
-		bezierCurve.RemoveControlPoint (bezierPoint);
+		bezierCurve.RemoveAnchorPoint (bezierPoint);
 		SceneView.RepaintAll ();
 	}
 

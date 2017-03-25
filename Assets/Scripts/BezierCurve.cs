@@ -20,12 +20,12 @@ public class BezierCurve : MonoBehaviour
 		}
 	}
 
-	public List<BezierPoint> GetControlPoints ()
+	public List<BezierPoint> GetAnchorPoints ()
 	{
 		return points;
 	}
 
-	public void AddControlPoint (BezierPoint bezierPoint, int index = 0)
+	public void AddAnchorPoint (BezierPoint bezierPoint, int index = 0)
 	{
 		if (!points.Contains (bezierPoint)) {
 			bezierPoint.name = string.Format ("Point {0}", points.Count);
@@ -39,12 +39,12 @@ public class BezierCurve : MonoBehaviour
 		}
 	}
 
-	public void RemoveControlPoint (BezierPoint bezierPoint)
+	public void RemoveAnchorPoint (BezierPoint bezierPoint)
 	{
 		points.Remove (bezierPoint);
 	}
 
-	public void RemoveAllControlPoints ()
+	public void RemoveAllAnchorPoints ()
 	{
 		points.Clear ();
 	}
@@ -210,7 +210,7 @@ public class BezierCurve : MonoBehaviour
 	{
 		List<BezierPoint> bezierPoints = bezierCurveData.points;
 		for (int i = 0; i < bezierPoints.Count; i++) {
-			AddControlPoint (bezierPoints [i]);
+			AddAnchorPoint (bezierPoints [i]);
 		}
 
 		connectedCurve = bezierCurveData.connectedCurve;
