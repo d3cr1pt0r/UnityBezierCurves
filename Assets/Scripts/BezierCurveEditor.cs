@@ -12,6 +12,7 @@ public class BezierCurveEditor : Editor
 	private int numberOfSampledPointsOnCurve = 0;
 	private string bezierCurveDataName = "";
 	private List<CurvePoint> curvePoints = null;
+	private BezierPoint lastSelectedPoint = null;
 
 	private void Init ()
 	{
@@ -55,6 +56,7 @@ public class BezierCurveEditor : Editor
 		}
 
 		EditorGUILayout.HelpBox ("To start adding points, hold left shift and left click in the 2D scene view.", MessageType.Info);
+		EditorGUILayout.HelpBox ("To quickly change node type, select a node and: \n  Shift+1  -> Connected\n  Shift+2  -> Broken\n  Shift+3  -> None", MessageType.Info);
 
 		GUILayout.Space (10);
 		GUILayout.BeginHorizontal ();
@@ -75,6 +77,23 @@ public class BezierCurveEditor : Editor
 	{
 		DrawAddPointsSceneControls ();
 		DrawPointsSceneControls ();
+
+		if (lastSelectedPoint != null) {
+			if (Event.current.shift) {
+				if (Event.current.type == EventType.keyDown) {
+					if (Event.current.keyCode == KeyCode.Alpha1) {
+						lastSelectedPoint.pointType = BezierPointType.Connected;
+					}
+					if (Event.current.keyCode == KeyCode.Alpha2) {
+						lastSelectedPoint.pointType = BezierPointType.Broken;
+					}
+					if (Event.current.keyCode == KeyCode.Alpha3) {
+						lastSelectedPoint.pointType = BezierPointType.None;
+					}
+				}
+			}
+		}
+
 		DrawCurve ();
 	}
 
@@ -174,7 +193,12 @@ public class BezierCurveEditor : Editor
 		for (int i = 0; i < points.Count; i++) {
 			BezierPoint bezierPoint = points [i];
 			float handleSize = HandleUtility.GetHandleSize (bezierPoint.position) * bezierCurve.handleSize;
+
+			EditorGUI.BeginChangeCheck ();
 			Vector3 position = Handles.FreeMoveHandle (bezierPoint.GetPosition (), Quaternion.identity, handleSize, GetSnapSize (), Handles.RectangleCap);
+			if (EditorGUI.EndChangeCheck ()) {
+				lastSelectedPoint = bezierPoint;
+			}
 
 			Handles.Label (bezierPoint.GetPosition () + Vector3.right * 0.5f, bezierPoint.name);
 
