@@ -16,6 +16,8 @@ public class BezierCurveEditor : Editor
 	private List<CurvePoint> curvePoints = null;
 	private BezierPoint lastSelectedPoint = null;
 	private List<BezierPoint> selectedPoints = null;
+	private BezierPoint grabbedBezierPoint = null;
+	private BezierPoint mouseOverBezierPoint = null;
 	private BezierPoint nearBezierPoint = null;
 	private CurvePoint nearCurvePoint = null;
 
@@ -76,7 +78,7 @@ public class BezierCurveEditor : Editor
 		GUILayout.EndHorizontal ();
 		GUILayout.Space (5);
 
-		DrawBezierPointControls (bezierCurve);
+		DrawBezierPointControls ();
 	}
 
 	private void OnSceneGUI ()
@@ -87,7 +89,7 @@ public class BezierCurveEditor : Editor
 		NodeTypeShortcuts ();
 	}
 
-	private void DrawBezierPointControls (BezierCurve bezierCurve)
+	private void DrawBezierPointControls ()
 	{
 		List<BezierPoint> points = bezierCurve.GetAnchorPoints ();
 		string[] bezierPointTypes = System.Enum.GetNames (typeof(BezierPointType));
@@ -148,8 +150,10 @@ public class BezierCurveEditor : Editor
 		List<BezierPoint> bezierPoints = bezierCurve.GetAnchorPoints ();
 		Vector2 mousePosition = GetMouseWorldPosition2D ();
 
-		nearBezierPoint = GetControlPointAtMousePosition (bezierPoints, mousePosition, 2.0f);
-		nearCurvePoint = GetCurvePointAtMousePosition (curvePoints, mousePosition, 0.4f);
+		nearBezierPoint = GetNearestControlPointAtMousePosition (bezierPoints, mousePosition, 10.0f);
+		nearCurvePoint = GetNearestCurvePointAtMousePosition (curvePoints, mousePosition, 1.0f);
+		mouseOverBezierPoint = GetControlPointAtMousePosition (bezierPoints, mousePosition);
+		UpdateGrabbedControlPoint (bezierPoints, mousePosition);
 
 		if (nearBezierPoint == null) {
 			DrawSceneAddPoint (nearCurvePoint, mousePosition);
@@ -160,8 +164,8 @@ public class BezierCurveEditor : Editor
 			BezierPoint bezierPoint = bezierPoints [i];
 			float handleSize = HandleUtility.GetHandleSize (bezierPoint.position) * bezierCurve.handleSize;
 
-			DrawSceneAnchorPointHandle (bezierPoint, nearBezierPoint, handleSize);
-			DrawSceneControlPointsHandle (bezierPoint, handleSize);
+			DrawSceneAnchorPointHandle (bezierPoint, nearBezierPoint, mousePosition, handleSize);
+			DrawSceneControlPointsHandle (bezierPoint, mousePosition, handleSize);
 		}
 	}
 
@@ -188,7 +192,7 @@ public class BezierCurveEditor : Editor
 		}
 	}
 
-	private void DrawSceneAnchorPointHandle (BezierPoint bezierPoint, BezierPoint nearBezierPoint, float handleSize)
+	private void DrawSceneAnchorPointHandle (BezierPoint bezierPoint, BezierPoint nearBezierPoint, Vector2 mousePosition, float handleSize)
 	{
 		if (selectedPoints.Contains (bezierPoint)) {
 			Vector3 p = bezierPoint.GetPosition () - new Vector3 (1, 1, 0) * handleSize;
@@ -198,10 +202,15 @@ public class BezierCurveEditor : Editor
 		if (bezierPoint == nearBezierPoint) {
 			Handles.color = Color.yellow;
 		}
-		Vector3 position = Handles.FreeMoveHandle (bezierPoint.GetPosition (), Quaternion.identity, handleSize, GetSnapSize (), Handles.RectangleCap);
-		Handles.color = Color.white;
 
+		Vector3 position = Handles.FreeMoveHandle (bezierPoint.GetPosition (), Quaternion.identity, handleSize, Vector3.zero, Handles.RectangleCap);
+		Handles.color = Color.white;
 		Handles.Label (bezierPoint.GetPosition () + Vector3.right * 0.5f, bezierPoint.name);
+
+		if (Event.current.control && bezierPoint == grabbedBezierPoint) {
+			position.x = Mathf.Round (mousePosition.x / bezierCurve.snapSize) * bezierCurve.snapSize;
+			position.y = Mathf.Round (mousePosition.y / bezierCurve.snapSize) * bezierCurve.snapSize;
+		}
 
 		if (bezierPoint.GetLocalPosition () != position) {
 			Undo.RecordObject (target, "Move Point");
@@ -209,11 +218,11 @@ public class BezierCurveEditor : Editor
 		}
 	}
 
-	private void DrawSceneControlPointsHandle (BezierPoint bezierPoint, float handleSize)
+	private void DrawSceneControlPointsHandle (BezierPoint bezierPoint, Vector2 mousePosition, float handleSize)
 	{
 		if (bezierPoint.pointType != BezierPointType.None) {
-			Vector3 handle1 = Handles.FreeMoveHandle (bezierPoint.GetHandle1Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.SphereCap);
-			Vector3 handle2 = Handles.FreeMoveHandle (bezierPoint.GetHandle2Position (), Quaternion.identity, handleSize, GetSnapSize (), Handles.SphereCap);
+			Vector3 handle1 = Handles.FreeMoveHandle (bezierPoint.GetHandle1Position (), Quaternion.identity, handleSize, Vector3.zero, Handles.SphereCap);
+			Vector3 handle2 = Handles.FreeMoveHandle (bezierPoint.GetHandle2Position (), Quaternion.identity, handleSize, Vector3.zero, Handles.SphereCap);
 
 			Handles.DrawLine (bezierPoint.GetPosition (), handle1);
 			Handles.DrawLine (bezierPoint.GetPosition (), handle2);
@@ -221,6 +230,11 @@ public class BezierCurveEditor : Editor
 			int handleToAdjust = 0;
 
 			if (bezierPoint.GetHandle1Position () != handle1) {
+				if (Event.current.control) {
+					handle1.x = Mathf.Round (mousePosition.x / bezierCurve.snapSize) * bezierCurve.snapSize;
+					handle1.y = Mathf.Round (mousePosition.y / bezierCurve.snapSize) * bezierCurve.snapSize;
+				}
+
 				Undo.RecordObject (target, "Move Handle Point 1");
 				bezierPoint.SetHandle1Position (handle1);
 
@@ -229,6 +243,11 @@ public class BezierCurveEditor : Editor
 				}
 			}
 			if (bezierPoint.GetHandle2Position () != handle2) {
+				if (Event.current.control) {
+					handle2.x = Mathf.Round (mousePosition.x / bezierCurve.snapSize) * bezierCurve.snapSize;
+					handle2.y = Mathf.Round (mousePosition.y / bezierCurve.snapSize) * bezierCurve.snapSize;
+				}
+
 				Undo.RecordObject (target, "Move Handle Point 2");
 				bezierPoint.SetHandle2Position (handle2);
 
@@ -335,12 +354,14 @@ public class BezierCurveEditor : Editor
 		return Vector3.one * bezierCurve.snapSize;
 	}
 
-	private CurvePoint GetCurvePointAtMousePosition (List<CurvePoint> curvePoints, Vector2 mousePosition, float minDistance)
+	private CurvePoint GetNearestCurvePointAtMousePosition (List<CurvePoint> curvePoints, Vector2 mousePosition, float minDistance)
 	{
 		for (int i = 0; i < curvePoints.Count; i++) {
 			Vector2 curvePoint2D = new Vector2 (curvePoints [i].position.x, curvePoints [i].position.y);
-			float distance = (mousePosition - curvePoint2D).magnitude;
-			if (distance < minDistance) {
+			float handleSize = HandleUtility.GetHandleSize (curvePoints [i].position) * bezierCurve.handleSize;
+			float pixelDistance = HandleUtility.DistanceToCircle (curvePoints [i].position, handleSize);
+
+			if (pixelDistance < minDistance) {
 				return curvePoints [i];
 			}
 		}
@@ -348,18 +369,46 @@ public class BezierCurveEditor : Editor
 		return null;
 	}
 
-	private BezierPoint GetControlPointAtMousePosition (List<BezierPoint> bezierPoints, Vector2 mousePosition, float minDistance)
+	private BezierPoint GetNearestControlPointAtMousePosition (List<BezierPoint> bezierPoints, Vector2 mousePosition, float minDistance)
 	{
 		for (int i = 0; i < bezierPoints.Count; i++) {
-			Vector2 point = new Vector2 (bezierPoints [i].GetPosition ().x, bezierPoints [i].GetPosition ().y);
-			float distance = (mousePosition - point).magnitude;
+			BezierPoint bezierPoint = bezierPoints [i];
+			float handleSize = HandleUtility.GetHandleSize (bezierPoint.position) * bezierCurve.handleSize;
+			float pixelDistance = HandleUtility.DistanceToRectangle (bezierPoint.GetPosition (), Quaternion.identity, handleSize);
 
-			if (distance < minDistance) {
-				return bezierPoints [i];
+			if (pixelDistance <= minDistance) {
+				return bezierPoint;
 			}
 		}
 
 		return null;
+	}
+
+	private BezierPoint GetControlPointAtMousePosition (List<BezierPoint> bezierPoints, Vector2 mousePosition)
+	{
+		for (int i = 0; i < bezierPoints.Count; i++) {
+			BezierPoint bezierPoint = bezierPoints [i];
+			float handleSize = HandleUtility.GetHandleSize (bezierPoint.position) * bezierCurve.handleSize;
+			float pixelDistance = HandleUtility.DistanceToRectangle (bezierPoint.GetPosition (), Quaternion.identity, handleSize);
+
+			if (pixelDistance <= 0) {
+				return bezierPoint;
+			}
+		}
+
+		return null;
+	}
+
+	private void UpdateGrabbedControlPoint (List<BezierPoint> bezierPoints, Vector2 mousePosition)
+	{
+		if (Event.current.type == EventType.mouseDown) {
+			if (Event.current.button == 0) {
+				grabbedBezierPoint = GetControlPointAtMousePosition (bezierPoints, mousePosition);
+			}
+		}
+		if (Event.current.type == EventType.mouseUp) {
+			grabbedBezierPoint = null;
+		}
 	}
 
 	private Vector3 GetMouseWorldPosition ()
