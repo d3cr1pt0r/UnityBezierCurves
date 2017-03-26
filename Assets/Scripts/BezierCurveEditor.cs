@@ -366,12 +366,12 @@ public class BezierCurveEditor : Editor
 			}
 			if (showTangents) {
 				Handles.color = Color.blue;
-				Handles.DrawLine (curvePoint.position, curvePoint.position + curvePoint.tangent * 5.0f);
+				Handles.DrawLine (curvePoint.position, curvePoint.position + curvePoint.tangent.normalized * 0.25f);
 				Handles.color = Color.white;
 			}
 			if (showNormals) {
 				Handles.color = Color.green;
-				Handles.DrawLine (curvePoint.position, curvePoint.position + curvePoint.normal * 5.0f);
+				Handles.DrawLine (curvePoint.position, curvePoint.position + curvePoint.normal.normalized * 0.25f);
 				Handles.color = Color.white;
 			}
 
