@@ -227,7 +227,7 @@ public class BezierCurveEditor : Editor
 		Handles.Label (bezierPoint.GetPosition () + Vector3.right * 0.5f, bezierPoint.name);
 
 		if (bezierPoint.GetLocalPosition () != position) {
-			if (Event.current.control) {
+			if (Event.current.control && grabbedBezierPoint == bezierPoint) {
 				position.x = Mathf.Round (mousePosition.x / bezierCurve.snapSize) * bezierCurve.snapSize;
 				position.y = Mathf.Round (mousePosition.y / bezierCurve.snapSize) * bezierCurve.snapSize;
 			}
