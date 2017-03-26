@@ -129,10 +129,18 @@ public class BezierCurve : MonoBehaviour
 					continue;
 				}
 
-				float step = (float)j / (float)sampleRate;
-				Vector3 position = GetPoint (p0, p1, step);
+				float stepC = (float)j / (float)sampleRate;
+				float stepF = stepC + 0.005f;
+				float stepB = stepC - 0.005f;
 
-				curvePoints.Add (new CurvePoint (position, Vector3.zero, Vector3.zero, i1));
+				Vector3 posC = GetPoint (p0, p1, stepC);
+				Vector3 posF = GetPoint (p0, p1, stepF);
+				Vector3 posB = GetPoint (p0, p1, stepB);
+
+				Vector3 tangent = (posF - posB);
+				Vector3 normal = Vector3.Cross (tangent, Vector3.forward);
+
+				curvePoints.Add (new CurvePoint (posC, normal, tangent, i1));
 			}
 		}
 

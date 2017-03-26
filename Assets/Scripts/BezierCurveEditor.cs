@@ -9,10 +9,13 @@ public class BezierCurveEditor : Editor
 	private BezierCurve bezierCurve = null;
 	private BezierCurveData bezierCurveData = null;
 	private bool showSettings = false;
+	private bool showCurve = true;
+	private bool showSamplePoints = true;
+	private bool showNormals = true;
+	private bool showTangents = true;
 	private string bezierCurveDataName = "";
 
 	private int numberOfSampledPointsOnCurve = 0;
-	private Color anchorPointHandleColor = Color.white;
 	private List<CurvePoint> curvePoints = null;
 	private BezierPoint lastSelectedPoint = null;
 	private List<BezierPoint> selectedPoints = null;
@@ -38,12 +41,52 @@ public class BezierCurveEditor : Editor
 
 	public override void OnInspectorGUI ()
 	{
+		EditorGUILayout.HelpBox ("To start adding points, hold left shift and left click in the 2D scene view.", MessageType.Info);
+		EditorGUILayout.HelpBox ("To quickly change node type, select a node and: \n  Shift+1  -> Connected\n  Shift+2  -> Broken\n  Shift+3  -> None", MessageType.Info);
+
+		GUIStyle style = new GUIStyle ();
+		style.fontStyle = FontStyle.Bold;
+
+		DrawInspectorSettings ();
+
+		GUILayout.Space (10);
+		GUILayout.BeginHorizontal ();
+		GUILayout.Label ("Points", style);
+		if (GUILayout.Button ("X", GUILayout.Width (18))) {
+			RemoveAllPoints ();
+		}
+		if (GUILayout.Button ("+", GUILayout.Width (18))) {
+			AddPoint ();
+		}
+		GUILayout.EndHorizontal ();
+		GUILayout.Space (5);
+
+		DrawInspectorBezierPointControls ();
+	}
+
+	private void OnSceneGUI ()
+	{
+		DrawCurve ();
+
+		DrawScenePointControls ();
+		NodeTypeShortcuts ();
+	}
+
+	private void DrawInspectorSettings ()
+	{
 		GUIStyle style = new GUIStyle ();
 		style.fontStyle = FontStyle.Bold;
 
 		showSettings = EditorGUILayout.Foldout (showSettings, "Show settings");
 		if (showSettings) {
+			GUILayout.Label ("Debug", style);
 			GUILayout.Label (string.Format ("Points on curve: {0}", numberOfSampledPointsOnCurve));
+			GUILayout.BeginHorizontal ();
+			showCurve = GUILayout.Toggle (showCurve, "Curve");
+			showSamplePoints = GUILayout.Toggle (showSamplePoints, "Sample points");
+			showNormals = GUILayout.Toggle (showNormals, "Normals");
+			showTangents = GUILayout.Toggle (showTangents, "Tangents");
+			GUILayout.EndHorizontal ();
 			GUILayout.Label ("Load/Save", style);
 			EditorGUILayout.BeginHorizontal ();
 			bezierCurveData = (BezierCurveData)EditorGUILayout.ObjectField ("Bezier curve", bezierCurveData, typeof(BezierCurveData), false);
@@ -63,33 +106,9 @@ public class BezierCurveEditor : Editor
 			DrawDefaultInspector ();
 		}
 
-		EditorGUILayout.HelpBox ("To start adding points, hold left shift and left click in the 2D scene view.", MessageType.Info);
-		EditorGUILayout.HelpBox ("To quickly change node type, select a node and: \n  Shift+1  -> Connected\n  Shift+2  -> Broken\n  Shift+3  -> None", MessageType.Info);
-
-		GUILayout.Space (10);
-		GUILayout.BeginHorizontal ();
-		GUILayout.Label ("Points", style);
-		if (GUILayout.Button ("X", GUILayout.Width (18))) {
-			RemoveAllPoints ();
-		}
-		if (GUILayout.Button ("+", GUILayout.Width (18))) {
-			AddPoint ();
-		}
-		GUILayout.EndHorizontal ();
-		GUILayout.Space (5);
-
-		DrawBezierPointControls ();
 	}
 
-	private void OnSceneGUI ()
-	{
-		DrawCurve ();
-
-		DrawScenePointControls ();
-		NodeTypeShortcuts ();
-	}
-
-	private void DrawBezierPointControls ()
+	private void DrawInspectorBezierPointControls ()
 	{
 		List<BezierPoint> points = bezierCurve.GetAnchorPoints ();
 		string[] bezierPointTypes = System.Enum.GetNames (typeof(BezierPointType));
@@ -207,12 +226,12 @@ public class BezierCurveEditor : Editor
 		Handles.color = Color.white;
 		Handles.Label (bezierPoint.GetPosition () + Vector3.right * 0.5f, bezierPoint.name);
 
-		if (Event.current.control && bezierPoint == grabbedBezierPoint) {
-			position.x = Mathf.Round (mousePosition.x / bezierCurve.snapSize) * bezierCurve.snapSize;
-			position.y = Mathf.Round (mousePosition.y / bezierCurve.snapSize) * bezierCurve.snapSize;
-		}
-
 		if (bezierPoint.GetLocalPosition () != position) {
+			if (Event.current.control) {
+				position.x = Mathf.Round (mousePosition.x / bezierCurve.snapSize) * bezierCurve.snapSize;
+				position.y = Mathf.Round (mousePosition.y / bezierCurve.snapSize) * bezierCurve.snapSize;
+			}
+
 			Undo.RecordObject (target, "Move Point");
 			bezierPoint.SetPosition (position);
 		}
@@ -306,6 +325,7 @@ public class BezierCurveEditor : Editor
 
 	private void NodeTypeShortcuts ()
 	{
+		Undo.RecordObject (bezierCurve, "Change node type");
 		if (lastSelectedPoint != null) {
 			if (Event.current.shift) {
 				if (Event.current.type == EventType.keyDown) {
@@ -339,14 +359,30 @@ public class BezierCurveEditor : Editor
 		for (int i = 0; i < curvePoints.Count; i++) {
 			CurvePoint curvePoint = curvePoints [i];
 
-			Handles.color = Color.red;
-			Handles.DrawSolidDisc (curvePoint.position, Vector3.forward, 0.05f);
-			Handles.color = Color.white;
+			if (showSamplePoints) {
+				Handles.color = Color.red;
+				Handles.DrawSolidDisc (curvePoint.position, Vector3.forward, 0.05f);
+				Handles.color = Color.white;
+			}
+			if (showTangents) {
+				Handles.color = Color.blue;
+				Handles.DrawLine (curvePoint.position, curvePoint.position + curvePoint.tangent * 5.0f);
+				Handles.color = Color.white;
+			}
+			if (showNormals) {
+				Handles.color = Color.green;
+				Handles.DrawLine (curvePoint.position, curvePoint.position + curvePoint.normal * 5.0f);
+				Handles.color = Color.white;
+			}
 
-			polyLinePoints.Add (curvePoint.position);
+			if (showCurve) {
+				polyLinePoints.Add (curvePoint.position);
+			}
 		}
 
-		Handles.DrawPolyLine (polyLinePoints.ToArray ());
+		if (showCurve) {
+			Handles.DrawPolyLine (polyLinePoints.ToArray ());
+		}
 	}
 
 	private Vector3 GetSnapSize ()
@@ -357,7 +393,6 @@ public class BezierCurveEditor : Editor
 	private CurvePoint GetNearestCurvePointAtMousePosition (List<CurvePoint> curvePoints, Vector2 mousePosition, float minDistance)
 	{
 		for (int i = 0; i < curvePoints.Count; i++) {
-			Vector2 curvePoint2D = new Vector2 (curvePoints [i].position.x, curvePoints [i].position.y);
 			float handleSize = HandleUtility.GetHandleSize (curvePoints [i].position) * bezierCurve.handleSize;
 			float pixelDistance = HandleUtility.DistanceToCircle (curvePoints [i].position, handleSize);
 
