@@ -10,9 +10,9 @@ public class BezierCurveEditor : Editor
 	private BezierCurveData bezierCurveData = null;
 	private bool showSettings = false;
 	private bool showCurve = true;
-	private bool showSamplePoints = true;
+	private bool showSamplePoints = false;
 	private bool showNormals = true;
-	private bool showTangents = true;
+	private bool showTangents = false;
 	private string bezierCurveDataName = "";
 
 	private int numberOfSampledPointsOnCurve = 0;
@@ -346,7 +346,7 @@ public class BezierCurveEditor : Editor
 
 	private void RefreshCurvePoints ()
 	{
-		curvePoints = bezierCurve.GetPoints (bezierCurve.sampleRate, includeLastPoint: true, createDoublePointsOnSharpEdges: true);
+		curvePoints = bezierCurve.GetPointsWithTangentAdjustment (includeLastPoint: true, createDoublePointsOnSharpEdges: true);
 	}
 
 	private void DrawCurve ()
@@ -363,6 +363,7 @@ public class BezierCurveEditor : Editor
 				Handles.color = Color.red;
 				Handles.DrawSolidDisc (curvePoint.position, Vector3.forward, 0.05f);
 				Handles.color = Color.white;
+				Handles.Label (curvePoint.position, i.ToString ());
 			}
 			if (showTangents) {
 				Handles.color = Color.blue;

@@ -12,6 +12,8 @@ public class BezierCurve : MonoBehaviour
 	[SerializeField] [Range (0.01f, 1.0f)] public float handleSize = 0.1f;
 	[SerializeField] [Range (0.1f, 1.0f)] public float snapSize = 0.5f;
 	[SerializeField] [Range (10, 100)] public int sampleRate = 30;
+	[SerializeField] [Range (0.0f, 0.2f)] public float tangentLimit = 0.9f;
+	[SerializeField] [Range (0.1f, 10.0f)] public float minDistance = 30.0f;
 
 	private void OnEnable ()
 	{
@@ -104,7 +106,7 @@ public class BezierCurve : MonoBehaviour
 		return GetPoint (p0, p1, t / curvePercent);
 	}
 
-	public List<CurvePoint> GetPoints (int sampleRate, bool includeLastPoint = true, bool createDoublePointsOnSharpEdges = false)
+	public List<CurvePoint> GetPoints (bool includeLastPoint = true, bool createDoublePointsOnSharpEdges = false)
 	{
 		List<CurvePoint> curvePoints = new List<CurvePoint> ();
 
@@ -120,17 +122,20 @@ public class BezierCurve : MonoBehaviour
 		for (int i = 0; i < loopCount; i++) {
 			int i0 = i;
 			int i1 = (i + 1) % points.Count;
+			int lc = loopCount - 1;
+			bool isLastAnchorPoint = i == lc;
 
 			BezierPoint p0 = points [i0];
 			BezierPoint p1 = points [i1];
 
 			for (int j = 0; j <= sampleRate; j++) {
-				bool isLastPointOnCurve = j == sampleRate && i < loopCount - 1;
-				bool isLastPoint = j == sampleRate && i == loopCount - 1;
-				bool a = isLastPointOnCurve && p1.pointType != BezierPointType.Connected && createDoublePointsOnSharpEdges;
+				bool isLastPointOnCurvePart = j == sampleRate;
+				bool c1 = isLastPointOnCurvePart && !isLastAnchorPoint;
+				bool isLastPoint = isLastPointOnCurvePart && isLastAnchorPoint;
+				bool c2 = c1 && p1.pointType != BezierPointType.Connected && createDoublePointsOnSharpEdges;
 
-				if (!a) {
-					if (isLastPointOnCurve || isLastPoint && connectedCurve && !includeLastPoint) {
+				if (!c2) {
+					if (c1 || isLastPoint && connectedCurve && !includeLastPoint) {
 						continue;
 					}
 				}
@@ -147,6 +152,84 @@ public class BezierCurve : MonoBehaviour
 				Vector3 normal = Vector3.Cross (tangent, Vector3.forward);
 
 				curvePoints.Add (new CurvePoint (posC, normal, tangent, i1));
+			}
+		}
+
+		return curvePoints;
+	}
+
+	public List<CurvePoint> GetPointsWithTangentAdjustment (bool includeLastPoint = true, bool createDoublePointsOnSharpEdges = false)
+	{
+		List<CurvePoint> curvePoints = new List<CurvePoint> ();
+
+		if (points.Count == 1) {
+			curvePoints.Add (new CurvePoint (points [0].GetPosition (), Vector3.zero, Vector3.zero));
+			return curvePoints;
+		}
+
+		int loopCount = points.Count - 1;
+		if (connectedCurve && points.Count > 1)
+			loopCount++;
+
+		for (int i = 0; i < loopCount; i++) {
+			int i0 = i;
+			int i1 = (i + 1) % points.Count;
+			int lc = loopCount - 1;
+			bool isLastAnchorPoint = i == lc;
+
+			BezierPoint p0 = points [i0];
+			BezierPoint p1 = points [i1];
+
+			float accumulatedDistance = 0.0f;
+			float tangentDot = 1.0f;
+			Vector3 lastTangent = Vector3.zero;
+			Vector3 lastPosition = Vector3.zero;
+
+			for (int j = 0; j <= sampleRate; j++) {
+				bool isLastPointOnCurvePart = j == sampleRate;
+				bool c1 = isLastPointOnCurvePart && !isLastAnchorPoint;
+				bool isLastPoint = isLastPointOnCurvePart && isLastAnchorPoint;
+				bool c2 = c1 && p1.pointType != BezierPointType.Connected && createDoublePointsOnSharpEdges;
+
+				if (!c2) {
+					if (c1 || isLastPoint && connectedCurve && !includeLastPoint) {
+						continue;
+					}
+				}
+
+				float stepC = (float)j / (float)sampleRate;
+				float stepF = stepC + 0.005f;
+				float stepB = stepC - 0.005f;
+
+				Vector3 posC = GetPoint (p0, p1, stepC);
+				Vector3 posF = GetPoint (p0, p1, stepF);
+				Vector3 posB = GetPoint (p0, p1, stepB);
+
+				Vector3 tangent = (posF - posB);
+				Vector3 normal = Vector3.Cross (tangent, Vector3.forward);
+
+				CurvePoint curvePoint = new CurvePoint (posC, normal, tangent, i1);
+
+				if (isLastPointOnCurvePart) {
+					curvePoints.Add (curvePoint);
+					continue;
+				}
+
+				if (j > 0) {
+					tangentDot = Vector3.Dot (tangent.normalized, lastTangent.normalized);
+					accumulatedDistance += Vector3.Distance (posC, lastPosition);
+
+					if (tangentDot < 1.0f - tangentLimit || accumulatedDistance >= minDistance) {
+						lastPosition = posC;
+						lastTangent = tangent;
+						curvePoints.Add (curvePoint);
+						accumulatedDistance = 0.0f;
+					}
+				} else {
+					lastPosition = posC;
+					lastTangent = tangent;
+					curvePoints.Add (curvePoint);
+				}
 			}
 		}
 
