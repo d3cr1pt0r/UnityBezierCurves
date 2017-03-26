@@ -346,7 +346,7 @@ public class BezierCurveEditor : Editor
 
 	private void RefreshCurvePoints ()
 	{
-		curvePoints = bezierCurve.GetPoints (bezierCurve.sampleRate, includeLastPoint: true);
+		curvePoints = bezierCurve.GetPoints (bezierCurve.sampleRate, includeLastPoint: true, createDoublePointsOnSharpEdges: true);
 	}
 
 	private void DrawCurve ()

@@ -104,7 +104,7 @@ public class BezierCurve : MonoBehaviour
 		return GetPoint (p0, p1, t / curvePercent);
 	}
 
-	public List<CurvePoint> GetPoints (int sampleRate, bool includeLastPoint = true)
+	public List<CurvePoint> GetPoints (int sampleRate, bool includeLastPoint = true, bool createDoublePointsOnSharpEdges = false)
 	{
 		List<CurvePoint> curvePoints = new List<CurvePoint> ();
 
@@ -125,8 +125,14 @@ public class BezierCurve : MonoBehaviour
 			BezierPoint p1 = points [i1];
 
 			for (int j = 0; j <= sampleRate; j++) {
-				if (j == sampleRate && i < loopCount - 1 || j == sampleRate && i == loopCount - 1 && connectedCurve && !includeLastPoint) {
-					continue;
+				bool isLastPointOnCurve = j == sampleRate && i < loopCount - 1;
+				bool isLastPoint = j == sampleRate && i == loopCount - 1;
+				bool a = isLastPointOnCurve && p1.pointType != BezierPointType.Connected && createDoublePointsOnSharpEdges;
+
+				if (!a) {
+					if (isLastPointOnCurve || isLastPoint && connectedCurve && !includeLastPoint) {
+						continue;
+					}
 				}
 
 				float stepC = (float)j / (float)sampleRate;
