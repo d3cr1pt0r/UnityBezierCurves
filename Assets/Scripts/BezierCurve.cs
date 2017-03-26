@@ -15,6 +15,8 @@ public class BezierCurve : MonoBehaviour
 	[SerializeField] [Range (0.0f, 0.2f)] public float tangentLimit = 0.9f;
 	[SerializeField] [Range (0.1f, 10.0f)] public float minDistance = 30.0f;
 
+	public Action<List<CurvePoint>> OnCurveUpdate;
+
 	private void OnEnable ()
 	{
 		for (int i = 0; i < points.Count; i++) {

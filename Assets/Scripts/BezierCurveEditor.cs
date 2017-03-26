@@ -70,6 +70,10 @@ public class BezierCurveEditor : Editor
 
 		DrawScenePointControls ();
 		NodeTypeShortcuts ();
+
+		if (bezierCurve.OnCurveUpdate != null) {
+			bezierCurve.OnCurveUpdate (curvePoints);
+		}
 	}
 
 	private void DrawInspectorSettings ()
