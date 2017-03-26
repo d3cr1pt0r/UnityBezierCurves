@@ -150,7 +150,7 @@ public class BezierCurveEditor : Editor
 		List<BezierPoint> bezierPoints = bezierCurve.GetAnchorPoints ();
 		Vector2 mousePosition = GetMouseWorldPosition2D ();
 
-		nearBezierPoint = GetNearestControlPointAtMousePosition (bezierPoints, mousePosition, 10.0f);
+		nearBezierPoint = GetNearestControlPointAtMousePosition (bezierPoints, mousePosition, 22.0f);
 		nearCurvePoint = GetNearestCurvePointAtMousePosition (curvePoints, mousePosition, 1.0f);
 		mouseOverBezierPoint = GetControlPointAtMousePosition (bezierPoints, mousePosition);
 		UpdateGrabbedControlPoint (bezierPoints, mousePosition);
